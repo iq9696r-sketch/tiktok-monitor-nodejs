@@ -1,38 +1,46 @@
 const { WebcastPushConnection } = require('tiktok-live-connector');
-const axios = require('axios');
-const http = require('http'); // أضفنا هذا لبقاء التطبيق حياً
+const TelegramBot = require('node-telegram-bot-api');
+const express = require('express');
 
-// إعدادات البيئة
+// 1. إعداد السيرفر لإرضاء Koyeb (المنفذ 8080)
+const app = express();
+const port = process.env.PORT || 8080;
+app.get('/', (req, res) => res.send('Bot is running!'));
+app.listen(port, () => console.log(`Server listening on port ${port}`));
+
+// 2. إعداد التلجرام والمتغيرات
 const token = process.env.TELEGRAM_TOKEN;
 const chatId = process.env.CHAT_ID;
 const tiktokUsername = process.env.TIKTOK_USERNAME;
+const bot = new TelegramBot(token);
 
-// 1. خادم وهمي لإبقاء Koyeb يعمل (Healthy)
-http.createServer((req, res) => {
-    res.write('TikTok Monitor is running!');
-    res.end();
-}).listen(process.env.PORT || 8080);
+// متغير لمنع إرسال رسائل متكررة للبث نفسه
+let isLive = false;
 
 async function checkLive() {
     console.log(`Checking status for: ${tiktokUsername}...`);
     let tiktokLiveConnection = new WebcastPushConnection(tiktokUsername);
+    
     try {
         await tiktokLiveConnection.connect();
-        const message = `🔴 الحساب ${tiktokUsername} مفتوح الآن بث مباشر! \n رابط البث: https://www.tiktok.com/@${tiktokUsername}/live`;
-        await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
-            chat_id: chatId,
-            text: message
-        });
-        console.log("Live notification sent!");
-        // بعد إرسال التنبيه، نفصل الاتصال حتى لا يستهلك الموارد
+        
+        // إذا نجح الاتصال ولم نكن قد أرسلنا تنبيهاً بعد
+        if (!isLive) {
+            const message = `🔴 الحساب ${tiktokUsername} مفتوح الآن بث مباشر! \n رابط البث: https://www.tiktok.com/@${tiktokUsername}/live`;
+            await bot.sendMessage(chat_id, message);
+            console.log("Live notification sent!");
+            isLive = true; 
+        }
+        
+        // نفصل الاتصال فوراً لتوفير الرام (نحن نحتاج فقط لمعرفة الحالة)
         tiktokLiveConnection.disconnect();
+        
     } catch (err) {
         console.log("User is offline");
+        isLive = false; // تصفير الحالة ليكون جاهزاً للتنبيه القادم
     }
 }
 
-// 2. تشغيل الفحص فوراً عند البدء
-checkLive();
-
-// 3. إعادة الفحص كل دقيقتين (120000 ميلي ثانية) لضمان استمرار العمل
+// 3. تشغيل الفحص كل دقيقتين
 setInterval(checkLive, 120000);
+checkLive(); // فحص فوري عند التشغيل
