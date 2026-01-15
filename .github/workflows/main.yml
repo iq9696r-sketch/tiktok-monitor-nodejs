@@ -2,14 +2,14 @@ name: TikTok Live Check
 
 on:
   schedule:
-    # سيتم تشغيل الفحص كل 5 دقائق
+    # تشغيل آلي كل 5 دقائق
     - cron: '*/5 * * * *'
-  workflow_dispatch: # للسماح لك بتشغيله يدوياً متى شئت
+  workflow_dispatch: # يتيح لك التشغيل اليدوي من المتصفح
 
 jobs:
   check-live:
     runs-on: ubuntu-latest
-    # منع المهمة من الاستمرار لأكثر من 3 دقائق
+    # منع العملية من الاستمرار للأبد
     timeout-minutes: 3
     
     steps:
@@ -26,6 +26,7 @@ jobs:
 
       - name: Run TikTok Check
         env:
+          # تأكد من تطابق هذه الأسماء مع ما وضعته في إعدادات GitHub Secrets
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: node index.js
