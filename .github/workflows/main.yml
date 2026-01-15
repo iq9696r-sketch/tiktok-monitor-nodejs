@@ -2,31 +2,30 @@ name: TikTok Live Check
 
 on:
   schedule:
-    # تشغيل آلي كل 5 دقائق
-    - cron: '*/5 * * * *'
-  workflow_dispatch: # يتيح لك التشغيل اليدوي من المتصفح
+    - cron: '*/5 * * * *' # تشغيل كل 5 دقائق
+  workflow_dispatch:      # زر للتشغيل اليدوي
 
 jobs:
   check-live:
     runs-on: ubuntu-latest
-    # منع العملية من الاستمرار للأبد
-    timeout-minutes: 3
+    timeout-minutes: 4 # حماية: يغلق العملية قسراً إذا علقت لأكثر من 4 دقائق
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '16'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Run TikTok Check
+      - name: Run Check Script
         env:
-          # تأكد من تطابق هذه الأسماء مع ما وضعته في إعدادات GitHub Secrets
+          # تأكد أن أسماء الـ Secrets في الإعدادات تطابق هذه الأسماء تماماً
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TIKTOK_USERNAME: ${{ secrets.TIKTOK_USERNAME }}
         run: node index.js
