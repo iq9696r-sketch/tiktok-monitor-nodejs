@@ -1,46 +1,43 @@
-const { WebcastPushConnection } = require('tiktok-live-connector');
-const TelegramBot = require('node-telegram-bot-api');
-const express = require('express');
+const { target_user_live } = require('tik-live-status');
+const axios = require('axios');
 
-// 1. إعداد السيرفر لإرضاء Koyeb (المنفذ 8080)
-const app = express();
-const port = process.env.PORT || 8080;
-app.get('/', (req, res) => res.send('Bot is running!'));
-app.listen(port, () => console.log(`Server listening on port ${port}`));
+// استبدل هذه القيم ببياناتك أو تأكد من ضبطها في Secrets
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TIKTOK_USER = "ضع_اسم_المستخدم_هنا"; 
 
-// 2. إعداد التلجرام والمتغيرات
-const token = process.env.TELEGRAM_TOKEN;
-const chatId = process.env.CHAT_ID;
-const tiktokUsername = process.env.TIKTOK_USERNAME;
-const bot = new TelegramBot(token);
-
-// متغير لمنع إرسال رسائل متكررة للبث نفسه
-let isLive = false;
-
-async function checkLive() {
-    console.log(`Checking status for: ${tiktokUsername}...`);
-    let tiktokLiveConnection = new WebcastPushConnection(tiktokUsername);
-    
+async function sendTelegramMessage(text) {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     try {
-        await tiktokLiveConnection.connect();
-        
-        // إذا نجح الاتصال ولم نكن قد أرسلنا تنبيهاً بعد
-        if (!isLive) {
-            const message = `🔴 الحساب ${tiktokUsername} مفتوح الآن بث مباشر! \n رابط البث: https://www.tiktok.com/@${tiktokUsername}/live`;
-            await bot.sendMessage(chat_id, message);
-            console.log("Live notification sent!");
-            isLive = true; 
-        }
-        
-        // نفصل الاتصال فوراً لتوفير الرام (نحن نحتاج فقط لمعرفة الحالة)
-        tiktokLiveConnection.disconnect();
-        
-    } catch (err) {
-        console.log("User is offline");
-        isLive = false; // تصفير الحالة ليكون جاهزاً للتنبيه القادم
+        await axios.post(url, {
+            chat_id: CHAT_ID,
+            text: text,
+            parse_mode: 'HTML'
+        });
+        console.log("Notification sent successfully!");
+    } catch (error) {
+        console.error("Error sending to Telegram:", error.message);
     }
 }
 
-// 3. تشغيل الفحص كل دقيقتين
-setInterval(checkLive, 120000);
-checkLive(); // فحص فوري عند التشغيل
+async function checkLive() {
+    console.log(`Checking live status for: ${TIKTOK_USER}...`);
+    try {
+        const liveStatus = await target_user_live(TIKTOK_USER);
+        
+        if (liveStatus && liveStatus.live) {
+            console.log("User is LIVE!");
+            await sendTelegramMessage(`🚨 <b>${TIKTOK_USER}</b> فاتح بث الآن! \n\nرابط البث: https://www.tiktok.com/@${TIKTOK_USER}/live`);
+        } else {
+            console.log("User is offline.");
+        }
+    } catch (error) {
+        console.error("Error checking TikTok status:", error.message);
+    }
+}
+
+// تنفيذ الفحص مرة واحدة فقط
+checkLive().then(() => {
+    console.log("Check completed.");
+    process.exit(0); // إغلاق السكربت بنجاح
+});
